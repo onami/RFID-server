@@ -94,6 +94,7 @@ END;
 	$checksum = $app->request()->post('checksum');
 	if(sha1($dump) != $checksum) {
 		echo 'corrupted_data<br/>';
+		return;
 		}
 //TODO::переделать проверку $dump, т.к. данные посылаются ВСЕГДА
 	if($dump == NULL) return;
@@ -102,10 +103,25 @@ END;
 	
 	if(json_last_error() != JSON_ERROR_NONE) {
 		echo 'corrupted_json<br/>';
+		return;
 	}
-$qu = "INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_stamp`, `coords`) VALUES ({$session->user_id}, '$checksum', '{$dump['time_stamp']}', GeomFromText('POINT({$dump['coords']})'))";
-echo '<br/>'.$qu.'<br/>';
- 	ORM::get_db()->exec($qu);
+
+	if(ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one() == TRUE)
+	{
+		echo 'duplicate';
+		return;
+
+	}
+
+//TODO::А что если будут пересылаться те же самые данные
+	ORM::get_db()->exec("INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_stamp`, `coords`) VALUES ({$session->user_id}, '$checksum', '{$dump['time_stamp']}', GeomFromText('POINT({$dump['coords']})'))");
+
+	$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
+
+//TODO::сделать в таблице композитный ключ.
+	foreach($dump['data'] as $tag) {
+		ORM::get_db()->exec("INSERT INTO `tubes` (`tag`, `session_id`, `status`) VALUES ('$tag', {$readingSessionId->session_id}, '1')");
+	}
  	
  	print_r($dump);
 
@@ -119,4 +135,3 @@ echo '<br/>'.$qu.'<br/>';
  * the Slim application using the settings and routes defined above.
  */
 $app->run();
-
