@@ -43,7 +43,6 @@ class HttpSession {
 	public static $sessionTtl = 900;
 
 	static function get() {
-		//TODO::фильтровать
 		global $app;
 
 		$sessionId = $app->getCookie('session_id');

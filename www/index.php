@@ -13,11 +13,15 @@ ORM::configure('mysql:host=localhost;dbname=test');
 ORM::configure('username', 'root');
 ORM::configure('password', '');
 
-//test client
+//test client 
 require_once 'mockClient.php';
 
-//install
+//install. db should be created in advance
 //require_once 'install.php';
+
+//TODO::добавить prepared_statements
+//TODO:: http://habrahabr.ru/post/113253/ разобраться с возращаемыми значения и с FALSE и NULL
+//Any method chain that ends in find_one() will return either a single instance of the ORM class representing the database row you requested, or false if no matching record was found.
 
 $app->post('/rfid/signup/', function() use($app) {
 	$login = $app->request()->post('login');
@@ -37,7 +41,6 @@ $app->post('/rfid/signup/', function() use($app) {
 });
 
 $app->post('/rfid/auth/', function() use($app) {
-	//TODO::filter unsafe symbols; Slim conditions seem not work with post-requests
 	$login = $app->request()->post('login');
 	$pass  = $app->request()->post('pass');
 	$user = User::get($login, $pass, 1);
