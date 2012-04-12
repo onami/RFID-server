@@ -29,7 +29,7 @@ $app->post('/rfid/signup/', function() use($app) {
 	$user = User::get('project', $pass, 0);
 
 	if($user == FALSE) {
-		return responseStatus(403);
+		return responseStatus(403, 'fail');
 	}
 	else if(User::doesUserExist($login) == FALSE) {
 		$pass = getRandomString();
@@ -74,7 +74,7 @@ $app->post('/rfid/post/', function() use($app) {
 	if(json_last_error() != JSON_ERROR_NONE) {
 		return responseStatus(403, Status::corruptedFormat);
 	}
-   
+
 	Report::create($user, $json, $checksum);
 });
 

@@ -42,10 +42,11 @@ class User {
 class HttpSession {
 	public static $sessionTtl = 900;
 
-	static function get() {
+	public static function get() {
 		global $app;
 
 		$sessionId = $app->getCookie('session_id');
+
 		$user = ORM::for_table('users')->where('session_id', $sessionId)->find_one();
 
 		if($user == FALSE || $user->status == Status::nonActive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
@@ -55,10 +56,10 @@ class HttpSession {
 		return $user;
 	}	
 
-	static function set($user) {
+	public static function set($user) {
 		global $app;
 		$sessionId = getRandomString();
-		$app->setcookie('session_id', $sessionId);
+		$app->setcookie('session_id', $sessionId, 0);
 		ORM::get_db()->exec("UPDATE `users` SET last_auth = '".date('Y-m-d h:i:s')."', session_id = '$sessionId' WHERE id = {$user->id}");
 	}
 }
@@ -72,6 +73,7 @@ class Report {
 		ORM::get_db()->exec("INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_stamp`, `coords`) VALUES ({$user->id}, '$checksum', '{$json['time_stamp']}', GeomFromText('POINT({$json['coords']})'))");
 
 		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
+		
 		foreach($json['data'] as $tag) {
 			ORM::get_db()->exec("INSERT INTO `tubes` (`tag`, `session_id`, `status`) VALUES ('$tag', {$readingSessionId->session_id}, '1')");
 		}

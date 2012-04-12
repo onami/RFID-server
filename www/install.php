@@ -46,9 +46,10 @@ CREATE TABLE IF NOT EXISTS `tubes` (
   `tag` varchar(40) NOT NULL,
   `session_id` int(11) NOT NULL,
   `status` int(11) NOT NULL,
-  UNIQUE KEY `tag` (`tag`,`session_id`)
+  PRIMARY KEY (`session_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=cp1251;
 
+ -- UNIQUE KEY `tag` (`tag`,`session_id`)
 --
 -- Dumping data for table `tubes`
 --
