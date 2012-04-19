@@ -1,7 +1,7 @@
 <?php
 error_reporting(E_ALL);
 
-//micro framework
+//micro frameworkw
 require_once 'Slim/Slim.php';
 //micro orm
 require_once 'idiorm.php';
@@ -9,7 +9,7 @@ require_once 'idiorm.php';
 require_once 'user.php';
 
 $app = new Slim(array());
-ORM::configure('mysql:host=localhost;dbname=test');
+ORM::configure('mysql:host=localhost;dbname=rfid');
 ORM::configure('username', 'root');
 ORM::configure('password', '');
 
@@ -20,8 +20,6 @@ require_once 'mockClient.php';
 //require_once 'install.php';
 
 //TODO::добавить prepared_statements
-//TODO:: http://habrahabr.ru/post/113253/ разобраться с возращаемыми значения и с FALSE и NULL
-//Any method chain that ends in find_one() will return either a single instance of the ORM class representing the database row you requested, or false if no matching record was found.
 
 $app->post('/rfid/signup/', function() use($app) {
 	$login = $app->request()->post('login');
@@ -78,6 +76,13 @@ $app->post('/rfid/post/', function() use($app) {
 	Report::create($user, $json, $checksum);
 });
 
+$app->get('/rfid/report/:year/', function($year) use($app) {
+	if(($user = HttpSession::get()) == FALSE) {
+		return responseStatus(403, Status::sessionExpired);
+	}
+
+	echo $year;
+});
+
 $app->run();
-echo HttpSession::sessionTtl;
 ?>

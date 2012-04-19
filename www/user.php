@@ -70,12 +70,12 @@ class Report {
 	}
 
 	static function create($user, $json, $checksum) {
-		ORM::get_db()->exec("INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_stamp`, `coords`) VALUES ({$user->id}, '$checksum', '{$json['time_stamp']}', GeomFromText('POINT({$json['coords']})'))");
+		ORM::get_db()->exec("INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_marker`, `location_id`, `status`) VALUES ({$user->id}, '$checksum', '{$json['time']}', '{$json['location']}', {$json['readingStatus']})");
 
 		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
 		
-		foreach($json['data'] as $tag) {
-			ORM::get_db()->exec("INSERT INTO `tubes` (`tag`, `session_id`, `status`) VALUES ('$tag', {$readingSessionId->session_id}, '1')");
+		foreach($json['tags'] as $tag) {
+			ORM::get_db()->exec("INSERT INTO `tubes` (`tag`, `session_id`) VALUES ('$tag', {$readingSessionId->session_id})");
 		}
 	}
 }

@@ -13,8 +13,8 @@ END;
 	static function ViewAuth() {
 		echo <<<END
 	<form action='/rfid/auth/' method='post'>
-		<input name='pass' type=text value='000ed8fcfa3ded5aadaccf1106ca156602796bd8' />
-		<input name='login' type=text value='test' />
+		<input name='login' type=text value='bgvlKW3ZAsLwzqLPkMXjG0oQJ6G4ax7eJxuZNbgN' />
+		<input name='pass' type=text value='bb5e1379ccaa46ab1dce6917e0be341706ab776e' />
 		<input type=submit />
 	</form>
 END;
@@ -23,9 +23,9 @@ END;
 	static function ViewPost() {
 		echo <<<END
 	<form action='/rfid/post/' method='post'>
-		<input name='json' type=text value='{"coords":"50 40","time_stamp":"2012-11-10 09:08:07", "data": ["rfid1", "rfid2", "rfid3"]}'>
+		<input name='json' type=text value='{"id":1,"time":"2012-04-19 05:54:51","location":"","deliveryStatus":0,"readingStatus":1,"tags":["01023412DC03011808308272","E2001985850C00542370212B","E2001985850C00710560DA72","E2001985850C013920304145","E2001985850C015327900395","E2001985850C01720900BE5C","E2001985850C02611270957D","E2001985850C02821860588C","E2009061530100600840C096"]}'>
 		<input  type=submit>
-		<input name='checksum' type=text value='80ae91392e52ba3a29078f9d9b889a767b5dfc98'>
+		<input name='checksum' type=text value="edd8005c6abc8bce242261231bdd050f24b4b887">
 	</form>
 END;
 	}

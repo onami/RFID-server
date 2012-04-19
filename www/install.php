@@ -26,8 +26,9 @@ CREATE TABLE IF NOT EXISTS `reading_sessions` (
   `session_id` int(11) NOT NULL AUTO_INCREMENT,
   `user_id` int(11) NOT NULL,
   `checksum` varchar(40) NOT NULL,
-  `time_stamp` datetime NOT NULL,
-  `coords` point NOT NULL,
+  `time_marker` datetime NOT NULL,
+  `location_id` varchar(40) DEFAULT NULL,
+  `status` int(11) NOT NULL,
   PRIMARY KEY (`session_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=cp1251 AUTO_INCREMENT=1 ;
 
@@ -43,17 +44,15 @@ CREATE TABLE IF NOT EXISTS `reading_sessions` (
 --
 
 CREATE TABLE IF NOT EXISTS `tubes` (
-  `tag` varchar(40) NOT NULL,
+  `tag` varchar(32) NOT NULL,
   `session_id` int(11) NOT NULL,
-  `status` int(11) NOT NULL,
-  PRIMARY KEY (`session_id`)
+  PRIMARY KEY (`session_id`, `tag`)
 ) ENGINE=MyISAM DEFAULT CHARSET=cp1251;
 
- -- UNIQUE KEY `tag` (`tag`,`session_id`)
+-- UNIQUE KEY `tag` (`tag`,`session_id`)
 --
 -- Dumping data for table `tubes`
 --
-
 
 -- --------------------------------------------------------
 
