@@ -17,6 +17,8 @@ class Status {
 	const corruptedChecksum = 'corruptedChecksum';
 	const corruptedFormat = 'corruptedFormat';
 	const duplicatedMessage = 'duplicatedMessage';	
+	const invalidCredentials = 'invalidCredentials';
+	const emptyRequest = 'emptyRequest';
 }
 
 class User {
