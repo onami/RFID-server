@@ -23,9 +23,9 @@ END;
 	static function ViewPost() {
 		echo <<<END
 	<form action='/rfid/post/' method='post'>
-		<input name='json' type=text value='{"id":1,"time":"2012-04-19 05:54:51","location":"","deliveryStatus":0,"readingStatus":1,"tags":["01023412DC03011808308272","E2001985850C00542370212B","E2001985850C00710560DA72","E2001985850C013920304145","E2001985850C015327900395","E2001985850C01720900BE5C","E2001985850C02611270957D","E2001985850C02821860588C","E2009061530100600840C096"]}'>
+		<input name='json' type=text value='{"id":1,"time":"2012-04-19 05:55:51","location":"","deliveryStatus":0,"readingStatus":1,"readingMode":7,"tags":["01023412DC03011808308272","E2001985850C00542370212B","E2001985850C00710560DA72","E2001985850C013920304145","E2001985850C015327900395","E2001985850C01720900BE5C","E2001985850C02611270957D","E2001985850C02821860588C","E2009061530100600840C096"]}'>
 		<input  type=submit>
-		<input name='checksum' type=text value="edd8005c6abc8bce242261231bdd050f24b4b887">
+		<input name='checksum' type=text value="5dae34044615a52af5841c624c2d8c4711f68ec2">
 	</form>
 END;
 	}

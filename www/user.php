@@ -2,23 +2,26 @@
 //TODO::Изменить на полностью рандомную строку
 function getRandomString() {
 			return sha1(microtime(true).mt_rand(10000,90000));
-	}
+}
 
-function responseStatus($status, $message = '') {
-		global $app;
+//В случае ошибки $error != NULL
+function response($error, $result = NULL) {		
+		echo json_encode(array('result' => $result, 'error' => $error));
+}
 
-		$app->response()->status($status);
-		echo $message;
-	}
+class ResponseStatus {
+	const internalServerError	= 1;
+	const sessionExpired		= 2;
+	const corruptedChecksum		= 3;
+	const corruptedFormat		= 4;
+	const duplicatedMessage		= 5;	
+	const invalidCredentials	= 6;
+	const emptyRequest			= 7;
+}
 
-class Status {
-	const nonActive = 0;
-	const sessionExpired = 'sessionExpired';
-	const corruptedChecksum = 'corruptedChecksum';
-	const corruptedFormat = 'corruptedFormat';
-	const duplicatedMessage = 'duplicatedMessage';	
-	const invalidCredentials = 'invalidCredentials';
-	const emptyRequest = 'emptyRequest';
+class UserStatus {
+	const inactive = 0;
+	const active = 1;
 }
 
 class User {
@@ -31,8 +34,11 @@ class User {
 
 	public static function create($login, $pass, $status = 1) {
 		//TODO::добавить соль
-		$pass = sha1($pass);
-		ORM::get_db()->exec("INSERT INTO `users` (`login`, `pass`, `status`) VALUES ('$login', '$pass', 1)");
+		$user = ORM::for_table('users')->create();
+		$user->pass = sha1($pass);
+		$user->login = $login;
+		$user->status = $status;
+		$user->save();
 	}
 
 	public static function get($login, $pass, $status = 1) {
@@ -51,7 +57,7 @@ class HttpSession {
 
 		$user = ORM::for_table('users')->where('session_id', $sessionId)->find_one();
 
-		if($user == FALSE || $user->status == Status::nonActive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
+		if($user == FALSE || $user->status == UserStatus::inactive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
 			return FALSE;
 		}
 
@@ -60,9 +66,11 @@ class HttpSession {
 
 	public static function set($user) {
 		global $app;
-		$sessionId = getRandomString();
-		$app->setcookie('session_id', $sessionId, 0);
-		ORM::get_db()->exec("UPDATE `users` SET last_auth = '".date('Y-m-d h:i:s')."', session_id = '$sessionId' WHERE id = {$user->id}");
+
+		$user->last_auth = date('Y-m-d h:i:s');
+		$user->session_id = getRandomString();
+		$user->save();
+		$app->setcookie('session_id', $user->session_id, 0);
 	}
 }
 
@@ -71,13 +79,34 @@ class Report {
 		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
 	}
 
-	static function create($user, $json, $checksum) {
-		ORM::get_db()->exec("INSERT INTO `reading_sessions` (`user_id`, `checksum`, `time_marker`, `location_id`, `status`) VALUES ({$user->id}, '$checksum', '{$json['time']}', '{$json['location']}', {$json['readingStatus']})");
+	static function getReportByDevice($device) {
+		$sessions = ORM::for_table('reading_session')->find_many();
+	}
 
-		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
-		
+	static function create($user, $json, $checksum) {
+		$session = ORM::for_table('reading_sessions')->create();
+		$session->user_id = $user->id;
+		$session->checksum = $checksum;
+		$session->time_marker = $json['time'];
+		$session->location_id = $json['location'];
+		$session->status = $json['readingStatus'];
+		$session->mode = $json['readingMode'];
+		$session->save();
+
+		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one()->session_id;
+
 		foreach($json['tags'] as $tag) {
-			ORM::get_db()->exec("INSERT INTO `tubes` (`tag`, `session_id`) VALUES ('$tag', {$readingSessionId->session_id})");
+			$record = ORM::for_table('tubes')->create();
+			$record->tag = $tag;
+			$record->session_id = $readingSessionId;
+			$record->save();
+
+			// $record = ORM::for_table('tags_list')->create();
+			// $record->tag = $tag;
+			// $record->last_mode = $session->mode;
+			// $record->save();
+
+			ORM::get_db()->exec("INSERT INTO `tags_list` (tag, last_mode) VALUES ('{$tag}', {$session->mode}) ON DUPLICATE KEY UPDATE last_mode = {$session->mode};");
 		}
 	}
 }

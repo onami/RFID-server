@@ -22,67 +22,103 @@ require_once 'mockClient.php';
 //TODO::добавить prepared_statements
 
 $app->post('/rfid/signup/', function() use($app) {
-	$login = $app->request()->post('login');
-	$pass  = $app->request()->post('pass');
-	$user = User::get('project', $pass, 0);
+	try	{
+		//Устройство предъявляет ключ проекта
+		$login = $app->request()->post('login');
+		$pass  = $app->request()->post('pass');
+		$user = User::get('project', $pass, 0);
 
-	if($user == TRUE && User::doesUserExist($login) == FALSE) {
-		$pass = getRandomString();
-		User::create($login, $pass);
-		return responseStatus(200, $pass);
-	}
-	else {
-		return responseStatus(403, Status::invalidCredentials);
-	}
+		//Если ключ верен и пользователя с таким логином незарегистривано
+		if($user == TRUE && User::doesUserExist($login) == FALSE) {
+			$pass = getRandomString();
+			User::create($login, $pass);
+			return response(NULL, $pass);
+		}
+		else {
+			return response(ResponseStatus::invalidCredentials);
+		}
+
+	} catch(Exception $e) {
+			return response(ResponseStatus::internalServerError, $e->getMessage());
+		}
 });
 
 $app->post('/rfid/auth/', function() use($app) {
-	$login = $app->request()->post('login');
-	$pass  = $app->request()->post('pass');
-	$user = User::get($login, $pass, 1);
+	try {
+		$login = $app->request()->post('login');
+		$pass  = $app->request()->post('pass');
+		$user = User::get($login, $pass, UserStatus::active);
 
-	if($user == FALSE) {
-		return responseStatus(403, Status::invalidCredentials);
+		if($user == FALSE) {
+			return response(ResponseStatus::invalidCredentials);
+		}
+
+		HttpSession::set($user);
+
+		return response(NULL);
+
+	} catch(Exception $e) {
+			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
-	HttpSession::set($user);
 });
 
 $app->post('/rfid/post/', function() use($app) {
-	if(($user = HttpSession::get()) == FALSE) {
-		return responseStatus(403, Status::sessionExpired);
+	try {
+		if(($user = HttpSession::get()) == FALSE) {
+			return response(ResponseStatus::sessionExpired);
+		}
+
+		//TODO::проверить на пустых данных
+		//TODO::добавить JsonScheme
+		$json = $app->request()->post('json');
+		$checksum = $app->request()->post('checksum');
+
+		if(strlen($json) == 0 || strlen($checksum) == 0) {
+			return response(ResponseStatus::emptyRequest);
+		}
+
+		if(sha1($json) != $checksum) {
+			return response(ResponseStatus::corruptedChecksum);
+		}
+
+		if(Report::get($checksum) != FALSE) {
+			return response(ResponseStatus::duplicatedMessage);
+		}
+
+		$json = json_decode($json, true);
+
+		if(json_last_error() != JSON_ERROR_NONE) {
+			return response(ResponseStatus::corruptedFormat);
+		}
+
+		try {
+			ORM::get_db()->beginTransaction();
+			Report::create($user, $json, $checksum);
+			ORM::get_db()->commit();
+		}
+		catch(Exception $e) {
+			ORM::get_db()->rollBack();
+			throw new Exception($e->getMessage());
+		}
+
+		return response(NULL);
+
+	} catch(Exception $e) {
+			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
-
-	//TODO::проверить на пустых данных
-	$json = $app->request()->post('json');
-	$checksum = $app->request()->post('checksum');
-
-	if(strlen($json) == 0 || strlen($checksum) == 0) {
-		return responseStatus(403, Status::emptyRequest);
-	}
-
-	if(sha1($json) != $checksum) {
-		return responseStatus(403, Status::corruptedChecksum);
-	}
-
-	if(Report::get($checksum) != FALSE) {
-		return responseStatus(403, Status::duplicatedMessage);
-	}
-
-	$json = json_decode($json, true);
-
-	if(json_last_error() != JSON_ERROR_NONE) {
-		return responseStatus(403, Status::corruptedFormat);
-	}
-
-	Report::create($user, $json, $checksum);
 });
 
-$app->get('/rfid/report/:year/', function($year) use($app) {
-	if(($user = HttpSession::get()) == FALSE) {
-		return responseStatus(403, Status::sessionExpired);
-	}
+//TODO::Сделать проверку
+$app->get('/rfid/report/id/:device/', function($device) use($app) {
+	try {
+		if(($user = HttpSession::get()) == FALSE) {
+			return response(ResponseStatus::sessionExpired);
+		}
 
-	echo $year;
+		echo $device;
+	} catch(Exception $e) {
+			return response(ResponseStatus::internalServerError, $e->getMessage());
+	}
 });
 
 $app->run();
