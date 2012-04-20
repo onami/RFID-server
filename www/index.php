@@ -110,15 +110,16 @@ $app->post('/rfid/post/', function() use($app) {
 
 //TODO::Сделать проверку
 $app->get('/rfid/report/id/:device/', function($device) use($app) {
-	try {
+//	try {
 		if(($user = HttpSession::get()) == FALSE) {
 			return response(ResponseStatus::sessionExpired);
 		}
 
-		echo $device;
-	} catch(Exception $e) {
-			return response(ResponseStatus::internalServerError, $e->getMessage());
-	}
+		//TODO::фильтр
+		Report::getReportByDevice($device);
+//	} catch(Exception $e) {
+	//		return response(ResponseStatus::internalServerError, $e->getMessage());
+//	}
 });
 
 $app->run();

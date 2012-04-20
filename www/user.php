@@ -79,8 +79,26 @@ class Report {
 		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
 	}
 
-	static function getReportByDevice($device) {
-		$sessions = ORM::for_table('reading_session')->find_many();
+	static function getReportByDevice($login) {
+
+		$user = ORM::for_table('users')->where('login', $login)->find_one();
+		if($user == null) return FALSE;
+
+
+		$sessions = ORM::for_table('reading_sessions')->where('user_id', $user->id)->find_many();
+		
+		echo '<style>body { font-family:Calibri;}</style>';
+		echo '<table><tr valign=top>';
+		foreach($sessions as $session) {
+			echo '<td><table border=1>';
+			echo '<tr><td><h2>'.$session->time_marker.'</h2></td>';
+			$tags = ORM::for_table('tubes')->where('session_id', $session->session_id)->find_many();
+			foreach($tags as $tag) {
+				echo '<tr><td>'.$tag->tag.'</td></tr>';			
+			}
+			echo '</table></td>';
+		}
+		echo '</tr></table>';
 	}
 
 	static function create($user, $json, $checksum) {
