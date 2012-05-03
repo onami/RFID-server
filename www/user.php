@@ -1,4 +1,13 @@
 <?php
+//Проверка на разрешенный IP
+function checkAllowedIP() {
+	$whiteList[0]="127.0.0.1";
+	if (in_array($_SERVER['REMOTE_ADDR'],$whiteList)) {
+		return true;
+	return false;
+	}
+}
+
 //TODO::Изменить на полностью рандомную строку
 function getRandomString() {
 			return sha1(microtime(true).mt_rand(10000,90000));
@@ -17,6 +26,7 @@ class ResponseStatus {
 	const duplicatedMessage		= 5;	
 	const invalidCredentials	= 6;
 	const emptyRequest			= 7;
+	const bannedIP				= 8;
 }
 
 class UserStatus {
@@ -26,10 +36,10 @@ class UserStatus {
 
 class User {
 	public static function doesUserExist($login) {
-		if(ORM::for_table('users')->where('login', $login)->find_one() == TRUE) {
-			return TRUE;
+		if(ORM::for_table('users')->where('login', $login)->find_one() == true) {
+			return true;
 		}
-		return FALSE;
+		return false;
 	}
 
 	public static function create($login, $pass, $status = 1) {
@@ -57,8 +67,8 @@ class HttpSession {
 
 		$user = ORM::for_table('users')->where('session_id', $sessionId)->find_one();
 
-		if($user == FALSE || $user->status == UserStatus::inactive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
-			return FALSE;
+		if($user == false || $user->status == UserStatus::inactive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
+			return false;
 		}
 
 		return $user;
@@ -79,36 +89,85 @@ class Report {
 		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
 	}
 
-	static function getReportByDevice($login) {
+	static function getReportByLocation($location) {
 
-		$user = ORM::for_table('users')->where('login', $login)->find_one();
-		if($user == null) return FALSE;
+		$total = ORM::for_table('tags_list')->raw_query(@"
+					SELECT count(*) as total
+					FROM tags_list tl, reading_sessions r
+					WHERE tl.last_session_id = r.session_id and r.location_id = {$location->id}", array())->find_one();
 
+		//Берём все сессии, связанные с данным расположением
+		//Подсчитываем число меток, связанных с этими сессиями
+		//TODO::делать подсчёт сразу же после создания записи о сессии
+		$results = ORM::for_table('tubes')->raw_query(@"
+			SELECT r.*, count(*) as total
+			FROM tubes t
+			JOIN reading_sessions r
+			ON t.session_id = r.session_id and r.location_id = {$location->id}
+			GROUP BY t.session_id
+			ORDER BY r.time_marker
+			", array())->find_many();
 
-		$sessions = ORM::for_table('reading_sessions')->where('user_id', $user->id)->find_many();
-		
-		echo '<style>body { font-family:Calibri;}</style>';
-		echo '<table><tr valign=top>';
-		foreach($sessions as $session) {
-			echo '<td><table border=1>';
-			echo '<tr><td><h2>'.$session->time_marker.'</h2></td>';
-			$tags = ORM::for_table('tubes')->where('session_id', $session->session_id)->find_many();
-			foreach($tags as $tag) {
-				echo '<tr><td>'.$tag->tag.'</td></tr>';			
-			}
-			echo '</table></td>';
+		$devices = array();
+		foreach(ORM::for_table('users')->find_many() as $device)
+		{
+			$devices[$device->id] = $device->description;
 		}
-		echo '</tr></table>';
+
+
+//Убрать в модель
+
+		echo <<<END
+<style>
+	tr.head { background: orange; }
+	tr.report:nth-child(even) {background: #CCC}
+	tr.report:nth-child(odd) {background: #FFF}
+	td.score {background: orange;}
+	tr { font-family: Calibri; }
+</style>
+END;
+
+		echo @"<table>
+		<thead>
+				<tr>
+					<td>Расположение:</td>
+					<td>{$location->description}</td>
+					<td>Всего числится меток:</td>
+					<td>{$total->total}</td>
+				</tr>
+			</thead>
+		<table>";
+
+		echo @"<table>
+		<thead>
+				<tr class='head'>
+					<td>Меток за сеанс</td>
+					<td>Время считывания</td>
+					<td>Считыватель</td>
+				</tr>
+			</thead>";
+
+
+		foreach($results as $tag) {
+			echo @"
+				<tr class='report'>
+					<td>{$tag->total}</td>
+					<td>{$tag->time_marker}</td>
+					<td>{$devices[$tag->device_id]}</td>
+				</tr>";
+		}
+
+		echo '</table>';
 	}
 
 	static function create($user, $json, $checksum) {
 		$session = ORM::for_table('reading_sessions')->create();
-		$session->user_id = $user->id;
+		$session->device_id = $user->id;
 		$session->checksum = $checksum;
 		$session->time_marker = $json['time'];
 		$session->location_id = $json['location'];
-		$session->status = $json['readingStatus'];
-		$session->mode = $json['readingMode'];
+		$session->reading_status = $json['readingStatus'];
+		$session->session_mode = $json['sessionMode'];
 		$session->save();
 
 		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one()->session_id;
@@ -119,12 +178,26 @@ class Report {
 			$record->session_id = $readingSessionId;
 			$record->save();
 
-			// $record = ORM::for_table('tags_list')->create();
-			// $record->tag = $tag;
-			// $record->last_mode = $session->mode;
-			// $record->save();
+			$tagInfo = ORM::for_table('tags_list')->where('tag', $tag)->find_one();
 
-			ORM::get_db()->exec("INSERT INTO `tags_list` (tag, last_mode) VALUES ('{$tag}', {$session->mode}) ON DUPLICATE KEY UPDATE last_mode = {$session->mode};");
+			if($tagInfo == false) {
+				$tagInfo = ORM::for_table('tags_list')->create();
+				$tagInfo->tag = $tag;
+			}
+
+			//Если запрос существует, надо учесть тот факт,
+			//что отчеты могут придти в разном порядке
+			//и более ранний по времени считывания окажется, последним из присланных
+
+			else {
+				$prevSessionTimeMarker = ORM::for_table('reading_sessions')->where('session_id', $tagInfo->last_session_id)->find_one()->time_marker;
+				if(strtotime($prevSessionTimeMarker) > strtotime($session->time_marker)) {
+					continue;
+				}
+			}
+
+			$tagInfo->last_session_id = $record->session_id;
+			$tagInfo->save();
 		}
 	}
 }

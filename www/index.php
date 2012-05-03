@@ -9,30 +9,37 @@ require_once 'idiorm.php';
 require_once 'user.php';
 
 $app = new Slim(array());
-ORM::configure('mysql:host=localhost;dbname=rfid');
+$dbname = "rfid";
+//Sjz1tib8uF7hEY5
+//abitechk_rfid
+ORM::configure('mysql:host=localhost;dbname='.$dbname);
 ORM::configure('username', 'root');
 ORM::configure('password', '');
+ORM::get_db()->exec('set names utf8');
 
 //test client 
 require_once 'mockClient.php';
 
 //install. db should be created in advance
-//require_once 'install.php';
+require_once 'install.php';
 
 //TODO::добавить prepared_statements
-
+//TODO::ограничить localhost
 $app->post('/rfid/signup/', function() use($app) {
 	try	{
+		if(checkAllowedIP() == false) {
+			return response(ResponseStatus::bannedIP);
+		}
 		//Устройство предъявляет ключ проекта
 		$login = $app->request()->post('login');
 		$pass  = $app->request()->post('pass');
 		$user = User::get('project', $pass, 0);
 
 		//Если ключ верен и пользователя с таким логином незарегистривано
-		if($user == TRUE && User::doesUserExist($login) == FALSE) {
+		if($user == true && User::doesUserExist($login) == false) {
 			$pass = getRandomString();
 			User::create($login, $pass);
-			return response(NULL, $pass);
+			return response(null, $pass);
 		}
 		else {
 			return response(ResponseStatus::invalidCredentials);
@@ -49,13 +56,13 @@ $app->post('/rfid/auth/', function() use($app) {
 		$pass  = $app->request()->post('pass');
 		$user = User::get($login, $pass, UserStatus::active);
 
-		if($user == FALSE) {
+		if($user == false) {
 			return response(ResponseStatus::invalidCredentials);
 		}
 
 		HttpSession::set($user);
 
-		return response(NULL);
+		return response(null);
 
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
@@ -64,7 +71,7 @@ $app->post('/rfid/auth/', function() use($app) {
 
 $app->post('/rfid/post/', function() use($app) {
 	try {
-		if(($user = HttpSession::get()) == FALSE) {
+		if(($user = HttpSession::get()) == false) {
 			return response(ResponseStatus::sessionExpired);
 		}
 
@@ -81,7 +88,7 @@ $app->post('/rfid/post/', function() use($app) {
 			return response(ResponseStatus::corruptedChecksum);
 		}
 
-		if(Report::get($checksum) != FALSE) {
+		if(Report::get($checksum) != false) {
 			return response(ResponseStatus::duplicatedMessage);
 		}
 
@@ -95,13 +102,12 @@ $app->post('/rfid/post/', function() use($app) {
 			ORM::get_db()->beginTransaction();
 			Report::create($user, $json, $checksum);
 			ORM::get_db()->commit();
-		}
-		catch(Exception $e) {
+		} catch(Exception $e) {
 			ORM::get_db()->rollBack();
 			throw new Exception($e->getMessage());
 		}
 
-		return response(NULL);
+		return response(null);
 
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
@@ -109,17 +115,24 @@ $app->post('/rfid/post/', function() use($app) {
 });
 
 //TODO::Сделать проверку
-$app->get('/rfid/report/id/:device/', function($device) use($app) {
-//	try {
-		if(($user = HttpSession::get()) == FALSE) {
+$app->get('/rfid/report/location/:location/', function($location) use($app) {
+	try {
+		if(($user = HttpSession::get()) == false) {
+
 			return response(ResponseStatus::sessionExpired);
 		}
 
+		$location = ORM::for_table('locations')->where('key', $location)->find_one();
+
+		if($location == false) {
+			return ;
+		}
+
 		//TODO::фильтр
-		Report::getReportByDevice($device);
-//	} catch(Exception $e) {
-	//		return response(ResponseStatus::internalServerError, $e->getMessage());
-//	}
+		Report::getReportByLocation($location);
+	} catch(Exception $e) {
+			return response(ResponseStatus::internalServerError, $e->getMessage());
+	}
 });
 
 $app->run();

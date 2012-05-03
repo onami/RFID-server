@@ -1,5 +1,7 @@
 <?php
-$app->get('/rfid/install/:dbname/', function($dbname) {
+global $dbname;
+
+$app->get('/rfid/install/', function($dbname) {
 	ORM::get_db()->exec(@"
 	  -- phpMyAdmin SQL Dump
 	  -- version 3.2.3
