@@ -1,89 +1,4 @@
-<?php
-//Проверка на разрешенный IP
-function checkAllowedIP() {
-	$whiteList[0]="127.0.0.1";
-	if (in_array($_SERVER['REMOTE_ADDR'],$whiteList)) {
-		return true;
-	return false;
-	}
-}
-
-//TODO::Изменить на полностью рандомную строку
-function getRandomString() {
-			return sha1(microtime(true).mt_rand(10000,90000));
-}
-
-//В случае ошибки $error != NULL
-function response($error, $result = NULL) {		
-		echo json_encode(array('result' => $result, 'error' => $error));
-}
-
-class ResponseStatus {
-	const internalServerError	= 1;
-	const sessionExpired		= 2;
-	const corruptedChecksum		= 3;
-	const corruptedFormat		= 4;
-	const duplicatedMessage		= 5;	
-	const invalidCredentials	= 6;
-	const emptyRequest			= 7;
-	const bannedIP				= 8;
-}
-
-class UserStatus {
-	const inactive = 0;
-	const active = 1;
-}
-
-class User {
-	public static function doesUserExist($login) {
-		if(ORM::for_table('users')->where('login', $login)->find_one() == true) {
-			return true;
-		}
-		return false;
-	}
-
-	public static function create($login, $pass, $status = 1) {
-		//TODO::добавить соль
-		$user = ORM::for_table('users')->create();
-		$user->pass = sha1($pass);
-		$user->login = $login;
-		$user->status = $status;
-		$user->save();
-	}
-
-	public static function get($login, $pass, $status = 1) {
-		return ORM::for_table('users')->where('login', $login)->where('pass', sha1($pass))->where('status', $status)->find_one();
-	}
-}
-
-//PHP doesn't support nested classed, alas
-class HttpSession {
-	public static $sessionTtl = 900;
-
-	public static function get() {
-		global $app;
-
-		$sessionId = $app->getCookie('session_id');
-
-		$user = ORM::for_table('users')->where('session_id', $sessionId)->find_one();
-
-		if($user == false || $user->status == UserStatus::inactive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
-			return false;
-		}
-
-		return $user;
-	}	
-
-	public static function set($user) {
-		global $app;
-
-		$user->last_auth = date('Y-m-d h:i:s');
-		$user->session_id = getRandomString();
-		$user->save();
-		$app->setcookie('session_id', $user->session_id, 0);
-	}
-}
-
+<?
 class Report {
 	static function get($checksum) {
 		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
@@ -166,6 +81,8 @@ END;
 		$session->checksum = $checksum;
 		$session->time_marker = $json['time'];
 		$session->location_id = $json['location'];
+		if(strlen($session->location_id) == 0)
+			$session->location_id = $user->location_id;
 		$session->reading_status = $json['readingStatus'];
 		$session->session_mode = $json['sessionMode'];
 		$session->save();

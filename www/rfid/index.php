@@ -1,30 +1,35 @@
 <?php
 error_reporting(E_ALL);
 
-//micro frameworkw
+//micro framework
 require_once 'Slim/Slim.php';
 //micro orm
 require_once 'idiorm.php';
-//some classes
-require_once 'user.php';
 
 $app = new Slim(array());
-$dbname = "rfid";
+$dbname = "rfid1";
+$basedir = "/rfid";
 
 ORM::configure('mysql:host=localhost;dbname='.$dbname);
 ORM::configure('username', 'root');
 ORM::configure('password', '');
 ORM::get_db()->exec('set names utf8');
 
+/*******************************************************/
+
+//controllers
+require_once 'user.php';
+require_once 'reports.php';
+require_once 'session.php';
+require_once 'auxiliary.php';
 //test client 
 require_once 'mockClient.php';
-
 //install. db should be created in advance
 require_once 'install.php';
 
 //TODO::добавить prepared_statements
-//TODO::ограничить localhost
-$app->post('/rfid/signup/', function() use($app) {
+
+$app->post('/signup/', function() use($app) {
 	try	{
 		if(checkAllowedIP() == false) {
 			return response(ResponseStatus::bannedIP);
@@ -49,26 +54,28 @@ $app->post('/rfid/signup/', function() use($app) {
 		}
 });
 
-$app->post('/rfid/auth/', function() use($app) {
+$app->post('/auth/', function() use($app) {
 	try {
 		$login = $app->request()->post('login');
 		$pass  = $app->request()->post('pass');
-		$user = User::get($login, $pass, UserStatus::active);
+		$user = User::get($login, $pass);
 
 		if($user == false) {
 			return response(ResponseStatus::invalidCredentials);
+		} else if($user->status == UserStatus::inactive){
+			return response(ResponseStatus::inactiveAccount);
 		}
 
 		HttpSession::set($user);
-
-		return response(null);
+		User::redirect($user);
 
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
 });
 
-$app->post('/rfid/post/', function() use($app) {
+
+$app->post('/post/', function() use($app) {
 	try {
 		if(($user = HttpSession::get()) == false) {
 			return response(ResponseStatus::sessionExpired);
@@ -114,11 +121,14 @@ $app->post('/rfid/post/', function() use($app) {
 });
 
 //TODO::Сделать проверку
-$app->get('/rfid/report/location/:location/', function($location) use($app) {
+$app->get('/report/location/:location/', function($location) use($app) {
 	try {
+		global $basedir;
+
 		if(($user = HttpSession::get()) == false) {
 
-			return response(ResponseStatus::sessionExpired);
+			header ("Location: {$basedir}/auth/", true, 303);
+			exit();
 		}
 
 		$location = ORM::for_table('locations')->where('key', $location)->find_one();
