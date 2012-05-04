@@ -10,7 +10,9 @@ class HttpSession {
 
 		$user = ORM::for_table('users')->where('session_id', $sessionId)->find_one();
 
-		if($user == false || $user->status == UserStatus::inactive || time() - strtotime($user->last_auth) >= self::$sessionTtl) {
+		$diff = strtotime(date('Y-m-d h:i:s')) - strtotime($user->last_auth);
+
+		if($user == false || $user->status == UserStatus::inactive || $diff >= self::$sessionTtl) {
 			return false;
 		}
 

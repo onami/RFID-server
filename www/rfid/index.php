@@ -7,7 +7,7 @@ require_once 'Slim/Slim.php';
 require_once 'idiorm.php';
 
 $app = new Slim(array());
-$dbname = "rfid1";
+$dbname = "rfid";
 $basedir = "/rfid";
 
 ORM::configure('mysql:host=localhost;dbname='.$dbname);
@@ -25,12 +25,19 @@ require_once 'auxiliary.php';
 //test client 
 require_once 'mockClient.php';
 //install. db should be created in advance
-require_once 'install.php';
+//require_once 'install.php';
 
 //TODO::добавить prepared_statements
 
-$app->post('/signup/', function() use($app) {
+$app->post('/signup/', 'signup');
+$app->post('/auth/', 'auth');
+$app->post('/post/', 'post');
+$app->get('/report/location/:location/', 'location');
+
+function signup() {
 	try	{
+		global $app;
+
 		if(checkAllowedIP() == false) {
 			return response(ResponseStatus::bannedIP);
 		}
@@ -52,10 +59,12 @@ $app->post('/signup/', function() use($app) {
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
 		}
-});
+}
 
-$app->post('/auth/', function() use($app) {
+function auth() {
 	try {
+		global $app;
+
 		$login = $app->request()->post('login');
 		$pass  = $app->request()->post('pass');
 		$user = User::get($login, $pass);
@@ -72,11 +81,12 @@ $app->post('/auth/', function() use($app) {
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
-});
+}
 
-
-$app->post('/post/', function() use($app) {
+function post() {
 	try {
+		global $app;
+
 		if(($user = HttpSession::get()) == false) {
 			return response(ResponseStatus::sessionExpired);
 		}
@@ -118,15 +128,15 @@ $app->post('/post/', function() use($app) {
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
-});
+}
 
 //TODO::Сделать проверку
-$app->get('/report/location/:location/', function($location) use($app) {
+function location($location) {
 	try {
+		global $app;
 		global $basedir;
 
 		if(($user = HttpSession::get()) == false) {
-
 			header ("Location: {$basedir}/auth/", true, 303);
 			exit();
 		}
@@ -142,7 +152,7 @@ $app->get('/report/location/:location/', function($location) use($app) {
 	} catch(Exception $e) {
 			return response(ResponseStatus::internalServerError, $e->getMessage());
 	}
-});
+}
 
 $app->run();
 ?>

@@ -4,8 +4,12 @@ RewriteEngine On
 # If you need to use the `RewriteBase` directive, it should be the
 # absolute physical path to the directory that contains this htaccess file.
 #
-# RewriteBase Z:/home/o/www/rfid/
+# RewriteBase
 
 AddDefaultCharset UTF-8
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^rfid/.*$ rfid/index.php [QSA,L]
+
+# RewriteCond %{REQUEST_FILENAME} !-d
+# RewriteRule ^rfid/.*$ rfid/index.php [QSA,L]
