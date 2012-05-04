@@ -10,8 +10,7 @@ require_once 'user.php';
 
 $app = new Slim(array());
 $dbname = "rfid";
-//Sjz1tib8uF7hEY5
-//abitechk_rfid
+
 ORM::configure('mysql:host=localhost;dbname='.$dbname);
 ORM::configure('username', 'root');
 ORM::configure('password', '');
