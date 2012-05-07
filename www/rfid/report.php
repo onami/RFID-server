@@ -1,15 +1,25 @@
 <?
 class Report {
-	static function get($checksum) {
-		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
+	static function getLocationById($locationKey) {
+		return $location = ORM::for_table('locations')->where('key', $locationKey)->find_one();
 	}
 
-	static function getReportByLocation($location) {
+	static function getReportByChecksum($checksum) {
+		return ORM::for_table('reading_sessions')
+			->where('checksum', $checksum)
+			->find_one();
+	}
 
-		$total = ORM::for_table('tags_list')->raw_query(@"
+	static function renderReportByLocation($location) {
+
+		$total = ORM::for_table('tags_list')
+			->raw_query(@"
 					SELECT count(*) as total
 					FROM tags_list tl, reading_sessions r
-					WHERE tl.last_session_id = r.session_id and r.location_id = {$location->id}", array())->find_one();
+					WHERE 
+						tl.last_session_id = r.session_id and
+						r.location_id = {$location->id}", array())
+			->find_one();
 
 		//Берём все сессии, связанные с данным расположением
 		//Подсчитываем число меток, связанных с этими сессиями
@@ -18,19 +28,19 @@ class Report {
 			SELECT r.*, count(*) as total
 			FROM tubes t
 			JOIN reading_sessions r
-			ON t.session_id = r.session_id and r.location_id = {$location->id}
+			ON
+				t.session_id = r.session_id and
+				r.location_id = {$location->id}
 			GROUP BY t.session_id
 			ORDER BY r.time_marker
 			", array())->find_many();
 
 		$devices = array();
-		foreach(ORM::for_table('users')->find_many() as $device)
-		{
+
+		foreach(ORM::for_table('devices')->find_many() as $device) {
 			$devices[$device->id] = $device->description;
 		}
 
-
-//Убрать в модель
 
 		echo <<<END
 <style>
@@ -75,19 +85,28 @@ END;
 		echo '</table>';
 	}
 
-	static function create($user, $json, $checksum) {
+	static function create($device, $json, $checksum) {
 		$session = ORM::for_table('reading_sessions')->create();
-		$session->device_id = $user->id;
+		$session->device_id = $device->id;
 		$session->checksum = $checksum;
 		$session->time_marker = $json['time'];
-		$session->location_id = $json['location'];
-		if(strlen($session->location_id) == 0)
-			$session->location_id = $user->location_id;
+
+		$location = self::getLocationById($json['location']);
+
+		if($location == false) {
+			$session->location_id = $device->location_id;
+		} else {
+			$session->location_id = $location->id;
+		}
+
 		$session->reading_status = $json['readingStatus'];
 		$session->session_mode = $json['sessionMode'];
 		$session->save();
 
-		$readingSessionId = ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one()->session_id;
+		$readingSessionId = ORM::for_table('reading_sessions')
+							->where('checksum', $checksum)
+							->find_one()
+							->session_id;
 
 		foreach($json['tags'] as $tag) {
 			$record = ORM::for_table('tubes')->create();
@@ -104,10 +123,14 @@ END;
 
 			//Если запрос существует, надо учесть тот факт,
 			//что отчеты могут придти в разном порядке
-			//и более ранний по времени считывания окажется, последним из присланных
-
+			//и более ранний по времени считывания окажется,
+			//последним из присланных
 			else {
-				$prevSessionTimeMarker = ORM::for_table('reading_sessions')->where('session_id', $tagInfo->last_session_id)->find_one()->time_marker;
+				$prevSessionTimeMarker = ORM::for_table('reading_sessions')
+					->where('session_id', $tagInfo->last_session_id)
+					->find_one()
+					->time_marker;
+
 				if(strtotime($prevSessionTimeMarker) > strtotime($session->time_marker)) {
 					continue;
 				}

@@ -4,6 +4,8 @@ error_reporting(E_ALL);
 //micro framework
 require_once 'Slim/Slim.php';
 //micro orm
+//Uses prepared statements throughout
+//to protect against SQL injection attacks.
 require_once 'idiorm.php';
 
 $app = new Slim(array());
@@ -17,140 +19,81 @@ ORM::get_db()->exec('set names utf8');
 
 /*******************************************************/
 
-//controllers
-require_once 'user.php';
-require_once 'reports.php';
-require_once 'session.php';
-require_once 'auxiliary.php';
-//test client 
+require_once 'device.php';
+require_once 'report.php';
+require_once 'response.php';
 require_once 'mockClient.php';
-//install. db should be created in advance
-//require_once 'install.php';
+//install.db should be
+//created in advance
+require_once 'install.php';
 
-//TODO::добавить prepared_statements
-
-$app->post('/signup/', 'signup');
-$app->post('/auth/', 'auth');
-$app->post('/post/', 'post');
+$app->post('/post/:deviceId/', 'post');
 $app->get('/report/location/:location/', 'location');
 
-function signup() {
-	try	{
-		global $app;
-
-		if(checkAllowedIP() == false) {
-			return response(ResponseStatus::bannedIP);
-		}
-		//Устройство предъявляет ключ проекта
-		$login = $app->request()->post('login');
-		$pass  = $app->request()->post('pass');
-		$user = User::get('project', $pass, 0);
-
-		//Если ключ верен и пользователя с таким логином незарегистривано
-		if($user == true && User::doesUserExist($login) == false) {
-			$pass = getRandomString();
-			User::create($login, $pass);
-			return response(null, $pass);
-		}
-		else {
-			return response(ResponseStatus::invalidCredentials);
-		}
-
-	} catch(Exception $e) {
-			return response(ResponseStatus::internalServerError, $e->getMessage());
-		}
-}
-
-function auth() {
+function post($deviceId) {
 	try {
 		global $app;
 
-		$login = $app->request()->post('login');
-		$pass  = $app->request()->post('pass');
-		$user = User::get($login, $pass);
+		$device = Device::get($deviceId);
 
-		if($user == false) {
-			return response(ResponseStatus::invalidCredentials);
-		} else if($user->status == UserStatus::inactive){
-			return response(ResponseStatus::inactiveAccount);
+		if($device == false) {
+			Response::Set(Response::invalidDeviceId);
+			return;
 		}
 
-		HttpSession::set($user);
-		User::redirect($user);
-
-	} catch(Exception $e) {
-			return response(ResponseStatus::internalServerError, $e->getMessage());
-	}
-}
-
-function post() {
-	try {
-		global $app;
-
-		if(($user = HttpSession::get()) == false) {
-			return response(ResponseStatus::sessionExpired);
-		}
-
-		//TODO::проверить на пустых данных
-		//TODO::добавить JsonScheme
+		//TODO::добавить JSON Scheme
 		$json = $app->request()->post('json');
 		$checksum = $app->request()->post('checksum');
 
 		if(strlen($json) == 0 || strlen($checksum) == 0) {
-			return response(ResponseStatus::emptyRequest);
+			return Response::Set(Response::emptyRequest);
 		}
 
 		if(sha1($json) != $checksum) {
-			return response(ResponseStatus::corruptedChecksum);
+			return Response::Set(Response::corruptedChecksum);
 		}
 
-		if(Report::get($checksum) != false) {
-			return response(ResponseStatus::duplicatedMessage);
+		if(Report::getReportByChecksum($checksum) != false) {
+			return Response::Set(Response::duplicatedMessage);
 		}
 
 		$json = json_decode($json, true);
 
+		//Не работает на PHP 5.2
 		if(json_last_error() != JSON_ERROR_NONE) {
-			return response(ResponseStatus::corruptedFormat);
+			return Response::Set(Response::corruptedFormat);
 		}
 
 		try {
 			ORM::get_db()->beginTransaction();
-			Report::create($user, $json, $checksum);
+			Report::create($device, $json, $checksum);
 			ORM::get_db()->commit();
 		} catch(Exception $e) {
 			ORM::get_db()->rollBack();
 			throw new Exception($e->getMessage());
 		}
 
-		return response(null);
+		Response::Set(null);
 
 	} catch(Exception $e) {
-			return response(ResponseStatus::internalServerError, $e->getMessage());
+			return Response::Set(Response::internalServerError, $e->getMessage());
 	}
 }
 
-//TODO::Сделать проверку
 function location($location) {
 	try {
-		global $app;
-		global $basedir;
-
-		if(($user = HttpSession::get()) == false) {
-			header ("Location: {$basedir}/auth/", true, 303);
-			exit();
-		}
-
-		$location = ORM::for_table('locations')->where('key', $location)->find_one();
+		
+		$location = Report::getLocationById($location);
 
 		if($location == false) {
-			return ;
+			return;
 		}
 
-		//TODO::фильтр
-		Report::getReportByLocation($location);
+		Report::renderReportByLocation($location);
+
 	} catch(Exception $e) {
-			return response(ResponseStatus::internalServerError, $e->getMessage());
+			Response::Set(Response::internalServerError, $e->getMessage());
+			return;
 	}
 }
 
