@@ -6,7 +6,7 @@ $app->get('/install/', function() {
 -- http://www.phpmyadmin.net
 --
 -- Host: localhost
--- Generation Time: May 07, 2012 at 10:19 AM
+-- Generation Time: May 08, 2012 at 09:53 AM
 -- Server version: 5.1.40
 -- PHP Version: 5.3.3
 
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS `devices` (
   `description` text NOT NULL,
   `status` tinyint(1) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `key` (`key`)
+  UNIQUE KEY `key` (`key`),
+  KEY `location_id` (`location_id`)
 ) ENGINE=InnoDB  DEFAULT CHARSET=cp1251 AUTO_INCREMENT=4 ;
 
 --
@@ -39,8 +40,8 @@ CREATE TABLE IF NOT EXISTS `devices` (
 
 INSERT INTO `devices` (`id`, `key`, `location_id`, `time_zone`, `description`, `status`) VALUES
 (1, 'bgvlKW3ZAsLwzqLPkMXjG0oQJ6G4ax7eJxuZNbgN', 1, 6, 'Стационарный считыватель DL 6970 №1', 0),
-(2, 'd3d21d444d4c27f9fdb9de2699b6b45571f14c18', 1, 56, 'Переносной считыватель DL 770 №1', 0),
-(3, 'b3e1290cc6e9cc2a197078f607481303348a981b', 2, 5, 'Переносной считыватель DL 770 №2', 0);
+(2, 'd3d21d444d4c27f9fdb9de2699b6b45571f14c18', 1, 5, 'Переносной считыватель DL 770 №1', 0),
+(3, 'b3e1290cc6e9cc2a197078f607481303348a981b', 1, 5, 'Переносной считыватель DL 770 №2', 0);
 
 -- --------------------------------------------------------
 
@@ -53,20 +54,14 @@ CREATE TABLE IF NOT EXISTS `locations` (
   `key` varchar(40) NOT NULL,
   `description` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=cp1251 AUTO_INCREMENT=8 ;
+) ENGINE=InnoDB  DEFAULT CHARSET=cp1251 AUTO_INCREMENT=2 ;
 
 --
 -- Dumping data for table `locations`
 --
 
 INSERT INTO `locations` (`id`, `key`, `description`) VALUES
-(1, '292f00aa9449566d1765691213406cc17c599589', 'Abitech Ltd.'),
-(2, 'c17c8fae131c597d656c1e928117a69f42d703cb', 'Скважина №1'),
-(3, '30f4376867416d76ae8e993659762239eb074b83', 'Скважина №2'),
-(4, '7a5ffdc34c3389872649516845ad51b9d730f7cf', 'Скважина №3'),
-(5, '49599f6f1d20143566577d01307ab586207ea3ca', 'Скважина №4'),
-(6, '6fb65843d4d3ad68f30ba8d1a94e53294db75769', 'Склад №1'),
-(7, 'c0165983ffdcb67b26755f9b7d7df0d21fb81087', 'Склад №2');
+(1, '292f00aa9449566d1765691213406cc17c599589', 'Abitech Ltd');
 
 -- --------------------------------------------------------
 
@@ -78,17 +73,41 @@ CREATE TABLE IF NOT EXISTS `reading_sessions` (
   `session_id` int(11) NOT NULL AUTO_INCREMENT,
   `device_id` int(11) NOT NULL,
   `checksum` varchar(40) NOT NULL,
+  `count` int(11) NOT NULL,
   `time_marker` datetime NOT NULL,
   `location_id` int(11) NOT NULL,
   `reading_status` int(11) NOT NULL,
   `session_mode` int(11) NOT NULL,
-  PRIMARY KEY (`session_id`)
+  PRIMARY KEY (`session_id`),
+  KEY `location_id` (`location_id`),
+  KEY `device_id` (`device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=cp1251 AUTO_INCREMENT=1 ;
 
 --
 -- Dumping data for table `reading_sessions`
 --
 
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `roles`
+--
+
+CREATE TABLE IF NOT EXISTS `roles` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `description` varchar(120) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB  DEFAULT CHARSET=cp1251 AUTO_INCREMENT=4 ;
+
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`id`, `description`) VALUES
+(1, 'Кладовщик'),
+(2, 'Буровой мастер'),
+(3, 'Руководитель буровых мастеров');
 
 -- --------------------------------------------------------
 
@@ -101,6 +120,7 @@ CREATE TABLE IF NOT EXISTS `tags_list` (
   `last_session_id` int(11) NOT NULL,
   `tag` varchar(60) NOT NULL,
   PRIMARY KEY (`tag`),
+  KEY `last_session_id` (`last_session_id`),
   KEY `id` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=cp1251 AUTO_INCREMENT=1 ;
 
@@ -125,6 +145,68 @@ CREATE TABLE IF NOT EXISTS `tubes` (
 -- Dumping data for table `tubes`
 --
 
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE IF NOT EXISTS `users` (
+  `user_id` int(11) NOT NULL,
+  `device_id` int(11) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `description` varchar(120) NOT NULL,
+  KEY `device_id` (`device_id`),
+  KEY `role_id` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=cp1251;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`user_id`, `device_id`, `role_id`, `description`) VALUES
+(1, 1, 1, 'Кладовщик №1'),
+(2, 2, 2, 'Буровой мастер №1'),
+(5, 2, 2, 'Буровой мастер №2'),
+(6, 1, 3, 'Руководитель №1'),
+(6, 2, 3, 'Руководитель №1');
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `devices`
+--
+ALTER TABLE `devices`
+  ADD CONSTRAINT `devices_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`);
+
+--
+-- Constraints for table `reading_sessions`
+--
+ALTER TABLE `reading_sessions`
+  ADD CONSTRAINT `reading_sessions_ibfk_1` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`),
+  ADD CONSTRAINT `reading_sessions_ibfk_2` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`);
+
+--
+-- Constraints for table `tags_list`
+--
+ALTER TABLE `tags_list`
+  ADD CONSTRAINT `tags_list_ibfk_1` FOREIGN KEY (`last_session_id`) REFERENCES `reading_sessions` (`session_id`);
+
+--
+-- Constraints for table `tubes`
+--
+ALTER TABLE `tubes`
+  ADD CONSTRAINT `tubes_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `reading_sessions` (`session_id`);
+
+--
+-- Constraints for table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `users_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`),
+  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`);
 ");
 });
 

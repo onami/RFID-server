@@ -1,0 +1,5 @@
+tr.head { background: orange; }
+tr.report:nth-child(even) {background: #CCC}
+tr.report:nth-child(odd) {background: #FFF}
+td.score {background: orange;}
+tr { font-family: Calibri; }

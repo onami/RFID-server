@@ -21,6 +21,7 @@ ORM::get_db()->exec('set names utf8');
 
 require_once 'device.php';
 require_once 'report.php';
+require_once 'report.view.php';
 require_once 'response.php';
 require_once 'mockClient.php';
 //install.db should be
@@ -28,7 +29,10 @@ require_once 'mockClient.php';
 require_once 'install.php';
 
 $app->post('/post/:deviceId/', 'post');
-$app->get('/report/location/:location/', 'location');
+$app->get('/report/location/:location/', 'reportOnLocation');
+$app->get('/report/device/:device/', 'reportOnDevice');
+$app->get('/report/user/:user/', 'reportOnUser');
+$app->get('/report/', 'ReportView::renderReportsList');
 
 function post($deviceId) {
 	try {
@@ -37,7 +41,7 @@ function post($deviceId) {
 		$device = Device::get($deviceId);
 
 		if($device == false) {
-			Response::Set(Response::invalidDeviceId);
+			Response::Set(Response::invalidDeviceKey);
 			return;
 		}
 
@@ -80,7 +84,26 @@ function post($deviceId) {
 	}
 }
 
-function location($location) {
+/* Reports */
+
+function reportOnUser($user) {
+	try {
+		
+		$user = Report::getUserById($user);
+
+		if($user == false) {
+			return;
+		}
+
+		ReportView::renderByUser($user);
+
+	} catch(Exception $e) {
+			Response::Set(Response::internalServerError, $e->getMessage());
+			return;
+	}
+}
+
+function reportOnLocation($location) {
 	try {
 		
 		$location = Report::getLocationById($location);
@@ -89,7 +112,24 @@ function location($location) {
 			return;
 		}
 
-		Report::renderReportByLocation($location);
+		ReportView::renderByLocation($location);
+
+	} catch(Exception $e) {
+			Response::Set(Response::internalServerError, $e->getMessage());
+			return;
+	}
+}
+
+function reportOnDevice($device) {
+	try {
+		
+		$device = Report::getDeviceById($device);
+
+		if($device == false) {
+			return;
+		}
+
+		ReportView::renderByDevice($device);
 
 	} catch(Exception $e) {
 			Response::Set(Response::internalServerError, $e->getMessage());

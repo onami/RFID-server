@@ -1,7 +1,7 @@
 <?php
 class Response {
 	const internalServerError	= 1;
-	const invalidDeviceId		= 2;
+	const invalidDeviceKey		= 2;
 	const corruptedChecksum		= 3;
 	const corruptedFormat		= 4;
 	const duplicatedMessage		= 5;	
