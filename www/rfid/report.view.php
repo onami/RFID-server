@@ -10,82 +10,64 @@
 	</style>";
 
 class ReportView {
-	static function renderReportsList() {
+
+	static function RenderList($viewData) {
 		global $style;
-		$locations = array();
-		
+
 		echo $style;
 
-		//Месторасположения
-		echo '<table><thead><tr class="head"><td>Месторасположения</td></thead>';
-		foreach(ORM::for_table('locations')->find_many() as $location)
-		{
-			$locations[$location->id] = $location->description;
-			echo "<tr class='report'><td><a href='location/{$location->id}/'>{$location->description}</a></td></tr>";
-		}
-		echo '</table>';
+		//Сотрудник
+		echo @"
+		<table>
+			<thead>
+				<tr class='head'>
+					<td>Сотрудник</td>
+					<td>Должность</td>
+				</tr>
+			</thead>";
 
-		//Устройства
-		$devices = ORM::for_table('devices')->find_many();
-		echo '<table><thead><tr class="head"><td colspan=2>Считыватели</td></tr></thead>';
-		foreach($devices as $device)
-		{
-			echo "<tr class='report'><td><a href='device/{$device->id}/'>{$device->description}</td><td>{$locations[$device->location_id]}</td></tr>";
-		}
-		echo '</table>';
-
-		$roles = Report::getRolesDictionary();
-
-		echo '<table><thead><tr class="head"><td>Персонал</td><td>Должность</td></thead>';
-		foreach(ORM::for_table('users')->group_by('user_id')->find_many() as $user) {
-			echo @"<tr class='report'><td><a href='user/{$user->user_id}/'>{$user->description}</td>
+		foreach($viewData['users'] as $user) {
+			echo @"<tr class='report'><td><a href='user/{$user->id}/'>{$user->description}</td>
 			<td>{$roles[$user->role_id]}</td></tr>";
 		}
-	}
+		echo "</table>";
 
-	static function renderByUser($user) {
-		$userDevices = ORM::for_table('users')->where('user_id', $user->user_id)->find_many();
+		echo @"
+		<table>
+			<thead>
+				<tr class='head'>
+					<td>Расположение</td>
+				</tr>
+			</thead>";
 
-		foreach($userDevices as $device) {
-			self::renderByDevice(Report::getDeviceById($device->device_id));
-			echo '<br/>';
+		foreach($viewData['locations'] as $location) {
+			echo @"<tr class='report'><td><a href='location/{$location->id}/'>{$location->description}</td>
+			<td>{$roles[$user->role_id]}</td></tr>";
 		}
+		echo "</table>";
 	}
 
-	static function renderByDevice($device) {
+	static function warehouseKeeperReport($viewData) {
 		global $style;
 
-		$location = Report::getLocationById($device->location_id);
+		$device = $viewData['device'];
 
-		//Считаем число уникальных меток, связанных с данным $device
-		$total = ORM::for_table('tags_list')
-			->raw_query(@"
-					SELECT count(*) as total
-					FROM tags_list tl, reading_sessions r
-					WHERE 
-						tl.last_session_id = r.session_id and
-						r.device_id = {$device->id}", array())
-			->find_one();
-
-		//Берём все сессии, связанные с данным расположением
-		$results = ORM::for_table('reading_sessions')->raw_query(@"
-			SELECT r.*
-			FROM reading_sessions r
-			WHERE r.device_id = {$device->id}
-			ORDER BY r.time_marker
-			", array())->find_many();
-
-		echo <<<END
-{$style}
-END;
+		echo $style;
 
 		echo @"<table border=1>
 		<thead>
-				<tr>
-					<td colspan=2>{$device->description}</td>
+				<tr class='head'>
+					<td>Сотрудник</td>
+					<td colspan=2>{$viewData['user']->description}</td>
 				</tr>
 				<tr>
-					<td colspan=2>Считано уникальных меток: {$total->total}</td>
+					<td colspan=3>Расположение: {$viewData['location']->description}</td>
+				</tr>
+					<tr>
+						<td colspan=3>{$device->description}</td>
+					</tr>
+				<tr>
+					<td colspan=3>Считано уникальных меток: {$viewData['total']}</td>
 				</tr>
 
 				<tr class='head'>
@@ -95,73 +77,77 @@ END;
 			</thead>";
 
 
-		foreach($results as $tag) {
+		foreach($viewData['sessions'] as $session) {
 			echo @"
 				<tr class='report'>
-					<td>{$tag->count}</td>
-					<td>{$tag->time_marker}</td>
+					<td>{$session->count}</td>
+					<td>{$session->time_marker}</td>
 				</tr>";
 		}
 
 		echo '</table>';
 	}
 
-	static function renderByLocation($location) {
+
+	static function toolPusherReport($viewData) {
 		global $style;
 
-		//Считаем число уникальных меток, связанных с данным $location
-		$total = ORM::for_table('tags_list')
-			->raw_query(@"
-					SELECT count(*) as total
-					FROM tags_list tl, reading_sessions r
-					WHERE 
-						tl.last_session_id = r.session_id and
-						r.location_id = {$location->id}", array())
-			->find_one();
+		$device = $viewData['device'];
+		$user = $viewData['user'];
 
-		//Берём все сессии, связанные с данным расположением
-		$results = ORM::for_table('reading_sessions')->raw_query(@"
-			SELECT r.*
-			FROM reading_sessions r
-			WHERE r.location_id = {$location->id}
-			ORDER BY r.time_marker
-			", array())->find_many();
+		echo $style;
 
-		$devices = Report::getDevicesDictionary();
-
-		echo <<<END
-{$style}
-END;
-
-		echo @"<table>
+		echo @"<table border=1>
 		<thead>
-				<tr>
-					<td>Расположение:</td>
-					<td>{$location->description}</td>
-					<td>Всего числится меток:</td>
-					<td>{$total->total}</td>
+				<tr class='head'>
+					<td>Сотрудник</td>
+					<td colspan=3>{$viewData['user']->description}</td>
 				</tr>
-			</thead>
-		<table>";
-
-		echo @"<table>
-		<thead>
+				<tr>
+					<td colspan=4>{$device->description}</td>
+				</tr>
+				<tr>
+					<td colspan=4>Считано уникальных меток: {$viewData['total']}</td>
+				</tr>
 				<tr class='head'>
 					<td>Меток за сеанс</td>
 					<td>Время считывания</td>
 					<td>Считыватель</td>
+					<td>Место считывания</td>
 				</tr>
 			</thead>";
 
 
-		foreach($results as $tag) {
+		foreach($viewData['sessions'] as $session) {
 			echo @"
 				<tr class='report'>
-					<td>{$tag->count}</td>
-					<td>{$tag->time_marker}</td>
-					<td>{$devices[$tag->device_id]}</td>
+					<td>{$session->count}</td>
+					<td>{$session->time_marker}</td>
+					<td>{$device->description}
+					<td>{$locations[$session->location_id]}
 				</tr>";
 		}
+
+		echo '</table>';
+	}
+
+
+	static function locationReport($viewData) {
+		global $style;
+
+		echo $style;
+
+		echo @"<table>
+		<thead>
+				<tr class='head'>
+					<td>Дата</td>
+					<td>Время</td>
+					<td>Считано</td>
+					<td>НКТ</td>
+					<td>Буровой мастер</td>
+				</tr>
+			</thead>
+		<table>";
 
 		echo '</table>';
 	}

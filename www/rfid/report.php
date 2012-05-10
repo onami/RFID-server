@@ -1,51 +1,50 @@
 <?
+class UserRole {
+	const warehouseKeeper = 1; //Кладовщик
+	const toolPusher = 2; //Буровой мастер
+	const oilrigManager = 3; //Руководитель буровых мастеров
+}
+
+class LocationType {
+	const warehouse = 1;
+	const well = 2; //скважина
+}
+
+
 class Report {
-	static function getLocationById($locationId) {
-		return $location = ORM::for_table('locations')->where('id', $locationId)->find_one();
+	static function getRecord($tableName, $row, $value) {
+		return $location = ORM::for_table($tableName)->where($row, $value)->find_one();		
 	}
 
-		static function getDeviceById($deviceId) {
-		return $location = ORM::for_table('devices')->where('id', $deviceId)->find_one();
+	static function getLocationById($id) {
+		return self::getRecord('locations', 'id', $id);
+	}
+
+	static function getDeviceById($id) {
+		return self::getRecord('devices', 'id', $id);
+	}
+
+	static function getDeviceByKey($key) {
+		return self::getRecord('devices', 'key', $key);
 	}
 
 	static function getReportByChecksum($checksum) {
-		return ORM::for_table('reading_sessions')->where('checksum', $checksum)->find_one();
+		return self::getRecord('reading_sessions', 'checksum', $checksum);
 	}
 
-	static function getUserById($userId) {
-		return ORM::for_table('users')->where('user_id', $userId)->find_one();
+	static function getUserById($id) {
+		return self::getRecord('users', 'id', $id);
 	}
 
 	//Словари
+	static function getDictionary($tableName) {
+		$objects = array();
 
-	//TODO::Обобщить
-	static function getRolesDictionary() {
-		$roles = array();
-		foreach(ORM::for_table('roles')->find_many() as $role) {
-			$roles[$role->id] = $role->description;
+		foreach(ORM::for_table($tableName)->find_many() as $object) {
+			$objects[] = $object;
 		}
 
-		return $roles;
-	}
-
-	static function getDevicesDictionary() {
-		$devices = array();
-
-		foreach(ORM::for_table('devices')->find_many() as $device) {
-			$devices[$device->id] = $device->description;
-		}
-
-		return $devices;
-	}
-
-	static function getLocationsDictionary() {
-		$locations = array();
-
-		foreach(ORM::for_table('locations')->find_many() as $location) {
-			$locations[$location->id] = $location->description;
-		}
-
-		return $locations;
+		return $objects;
 	}
 
 	//Создание отчета
@@ -72,7 +71,7 @@ class Report {
 		$readingSessionId = ORM::for_table('reading_sessions')
 							->where('checksum', $checksum)
 							->find_one()
-							->session_id;
+							->id;
 
 		foreach($json['tags'] as $tag) {
 			$record = ORM::for_table('tubes')->create();
@@ -93,7 +92,7 @@ class Report {
 			//последним из присланных
 			else {
 				$prevSessionTimeMarker = ORM::for_table('reading_sessions')
-					->where('session_id', $tagInfo->last_session_id)
+					->where('id', $tagInfo->last_session_id)
 					->find_one()
 					->time_marker;
 

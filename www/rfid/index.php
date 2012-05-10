@@ -19,7 +19,6 @@ ORM::get_db()->exec('set names utf8');
 
 /*******************************************************/
 
-require_once 'device.php';
 require_once 'report.php';
 require_once 'report.view.php';
 require_once 'response.php';
@@ -28,17 +27,16 @@ require_once 'mockClient.php';
 //created in advance
 require_once 'install.php';
 
-$app->post('/post/:deviceId/', 'post');
-$app->get('/report/location/:location/', 'reportOnLocation');
-$app->get('/report/device/:device/', 'reportOnDevice');
+$app->post('/post/:deviceKey/', 'post');
 $app->get('/report/user/:user/', 'reportOnUser');
-$app->get('/report/', 'ReportView::renderReportsList');
+$app->get('/report/', 'reportsList');
+$app->get('/report/location/:location/', 'reportOnLocation');
 
-function post($deviceId) {
+function post($deviceKey) {
 	try {
 		global $app;
 
-		$device = Device::get($deviceId);
+		$device = Report::getDeviceByKey($deviceKey);
 
 		if($device == false) {
 			Response::Set(Response::invalidDeviceKey);
@@ -72,69 +70,171 @@ function post($deviceId) {
 			ORM::get_db()->beginTransaction();
 			Report::create($device, $json, $checksum);
 			ORM::get_db()->commit();
-		} catch(Exception $e) {
+		}
+
+		catch(Exception $e) {
 			ORM::get_db()->rollBack();
 			throw new Exception($e->getMessage());
 		}
 
 		Response::Set(null);
 
-	} catch(Exception $e) {
-			return Response::Set(Response::internalServerError, $e->getMessage());
+	}
+
+	catch(Exception $e) {
+		return Response::Set(Response::internalServerError, $e->getMessage());
 	}
 }
 
 /* Reports */
 
+function reportsList() {
+		$viewData = array();
+		$viewData['roles'] = Report::getDictionary('roles');
+		$viewData['users'] = Report::getDictionary('users');
+		$viewData['locations'] = Report::getDictionary('locations');
+
+		ReportView::RenderList($viewData);
+}
+
 function reportOnUser($user) {
-	try {
-		
+	try {		
 		$user = Report::getUserById($user);
 
 		if($user == false) {
 			return;
 		}
 
-		ReportView::renderByUser($user);
+		if($user->role_id == UserRole::warehouseKeeper || $user->role_id == UserRole::toolPusher) {
+			$viewData = array();
+			$relDevice = Report::getRecord('users_rel', 'user_id', $user->id)->device_id;
+			$viewData['device'] = Report::getDeviceById($relDevice);
 
-	} catch(Exception $e) {
-			Response::Set(Response::internalServerError, $e->getMessage());
-			return;
+			$viewData['user'] = $user;
+			$viewData['location'] = Report::getLocationById($user->location_id);
+			$viewData['locations'] = Report::getDictionary('locations');
+
+			//Считаем число уникальных меток, связанных с данным $device
+			$viewData['total'] = ORM::for_table('tags_list')
+				->raw_query(@"
+						SELECT count(*) as total
+						FROM tags_list tl, reading_sessions r
+						WHERE 
+							tl.last_session_id = r.id and
+							r.device_id = {$viewData['device']->id}", array())
+				->find_one()->total;
+			//Берём все сессии, связанные с данным расположением
+			$viewData['sessions'] = ORM::for_table('reading_sessions')
+				->raw_query(@"
+					SELECT r.*
+					FROM reading_sessions r
+					WHERE r.device_id = {$viewData['device']->id}
+					ORDER BY r.device_id, r.time_marker
+					", array())->find_many();
+		}
+
+		if($user->role_id == UserRole::warehouseKeeper) {
+			ReportView::warehouseKeeperReport($viewData);
+		}
+
+		else if($user->role_id == UserRole::toolPusher) {
+			ReportView::toolPusherReport($viewData);
+		}
+
+		else if($user->role_id == UserRole::oilrigManager) {
+			$viewData = array();
+
+			foreach(ORM::for_table('users_rel')->where('user_id', $user->id)->find_many() as $manager) {
+				foreach(ORM::for_table(`users_rel`)->where('user_id', $manager->rel_user_id)->find_many() as $pusher) {
+					$viewData['users'][$pusher->device_id] = Report::getDeviceById($userRel->device_id);
+				}
+			}
+
+			$viewData['user'] = $user;
+			$viewData['locations'] = Report::getDictionary('locations');
+
+			//Считаем число уникальных меток, связанных с данным $device
+			$viewData['total'] = ORM::for_table('tags_list')
+				->raw_query(@"
+						SELECT count(*) as total
+						FROM tags_list tl, reading_sessions r
+						WHERE 
+							tl.last_session_id = r.id and
+							r.device_id IN
+								(
+								SELECT device_id FROM users_rel
+								WHERE user_id = {$user->id}
+								)", array())
+				->find_one()->total;
+
+			//Берём все сессии, связанные с данным расположением
+			$viewData['sessions'] = ORM::for_table('reading_sessions')
+				->raw_query(@"
+					SELECT r.*
+					FROM reading_sessions r
+					WHERE r.device_id IN
+							(
+							SELECT device_id FROM users_rel
+							WHERE user_id = {$user->id}
+							)
+					ORDER BY r.device_id, r.time_marker
+					", array())->find_many();
+		}
+	}
+
+	catch(Exception $e) {
+		Response::Set(Response::internalServerError, $e->getMessage());
+		return;
 	}
 }
 
 function reportOnLocation($location) {
 	try {
-		
 		$location = Report::getLocationById($location);
 
 		if($location == false) {
 			return;
 		}
-
-		ReportView::renderByLocation($location);
-
-	} catch(Exception $e) {
-			Response::Set(Response::internalServerError, $e->getMessage());
-			return;
-	}
-}
-
-function reportOnDevice($device) {
-	try {
 		
-		$device = Report::getDeviceById($device);
+		$viewData = array();
+		$viewData['location'] = $location;
 
-		if($device == false) {
-			return;
+		$viewData['total'] = ORM::for_table('tags_list')
+			->raw_query(@"
+			SELECT count(*) as total
+			FROM tags_list tl, reading_sessions r
+			WHERE
+				tl.last_session_id = r.id and
+				r.location_id = {$location->id}", array())
+			->find_one();
+
+		//Берём все сессии, связанные с данным расположением
+		$viewData['sessions'] = ORM::for_table('reading_sessions')
+			->raw_query(@"
+			SELECT r.id as session_id, r.time_marker, u.description as user_description
+			FROM reading_sessions r, users u, users_rel rel
+			WHERE r.location_id = {$location->id} and r.device_id = rel.device_id and rel.user_id = u.id
+			ORDER BY r.time_marker, u.description
+				", array())->find_many();
+
+		echo count($viewData['sessions']);
+
+
+		foreach($viewData['sessions'] as $session) {
+			$viewData['tags'][$session->id] = ORM::for_table('tubes')
+				->raw_query(@"
+					SELECT t.* FROM `tubes` t, `reading_sessions` r
+					WHERE r.location_id = {$location->id} and t.session_id = {$session->session_id}", array())
+				->find_many();
 		}
 
-		ReportView::renderByDevice($device);
-
-	} catch(Exception $e) {
-			Response::Set(Response::internalServerError, $e->getMessage());
-			return;
+		ReportView::locationReport($viewData);
 	}
+	catch(Exception $e) {
+		Response::Set(Response::internalServerError, $e->getMessage());
+		return;
+	}
+
 }
 
 $app->run();
