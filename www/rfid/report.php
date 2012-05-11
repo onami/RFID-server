@@ -20,6 +20,10 @@ class Report {
 		return self::getRecord('locations', 'id', $id);
 	}
 
+	static function getLocationByKey($key) {
+		return self::getRecord('locations', 'key', $key);
+	}
+
 	static function getDeviceById($id) {
 		return self::getRecord('devices', 'id', $id);
 	}
@@ -41,7 +45,7 @@ class Report {
 		$objects = array();
 
 		foreach(ORM::for_table($tableName)->find_many() as $object) {
-			$objects[] = $object;
+			$objects[$object->id] = $object;
 		}
 
 		return $objects;
@@ -55,7 +59,7 @@ class Report {
 		$session->count = count($json['tags']);
 		$session->time_marker = $json['time'];
 
-		$location = self::getLocationById($json['location']);
+		$location = self::getLocationByKey($json['location']);
 
 		if($location == false) {
 			$session->location_id = $device->location_id;

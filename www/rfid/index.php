@@ -129,7 +129,7 @@ function reportOnUser($user) {
 					SELECT r.*
 					FROM reading_sessions r
 					WHERE r.device_id = {$viewData['device']->id}
-					ORDER BY r.device_id, r.time_marker
+					ORDER BY r.location_id, r.device_id, r.time_marker
 					", array())->find_many();
 		}
 
@@ -143,42 +143,18 @@ function reportOnUser($user) {
 
 		else if($user->role_id == UserRole::oilrigManager) {
 			$viewData = array();
+			$viewData['user'] = $user;
+			ReportView::oilrigManagerReport($viewData);
 
 			foreach(ORM::for_table('users_rel')->where('user_id', $user->id)->find_many() as $manager) {
-				foreach(ORM::for_table(`users_rel`)->where('user_id', $manager->rel_user_id)->find_many() as $pusher) {
-					$viewData['users'][$pusher->device_id] = Report::getDeviceById($userRel->device_id);
+				foreach(ORM::for_table('users_rel')->where('user_id', $manager->rel_user_id)->find_many() as $pusher) {
+				   reportOnUser($pusher->user_id);
+				   echo "<hr/>";
+				//	$viewData['users'][$pusher->device_id] = Report::getDeviceById($pusher->device_id);
 				}
 			}
 
-			$viewData['user'] = $user;
-			$viewData['locations'] = Report::getDictionary('locations');
 
-			//Считаем число уникальных меток, связанных с данным $device
-			$viewData['total'] = ORM::for_table('tags_list')
-				->raw_query(@"
-						SELECT count(*) as total
-						FROM tags_list tl, reading_sessions r
-						WHERE 
-							tl.last_session_id = r.id and
-							r.device_id IN
-								(
-								SELECT device_id FROM users_rel
-								WHERE user_id = {$user->id}
-								)", array())
-				->find_one()->total;
-
-			//Берём все сессии, связанные с данным расположением
-			$viewData['sessions'] = ORM::for_table('reading_sessions')
-				->raw_query(@"
-					SELECT r.*
-					FROM reading_sessions r
-					WHERE r.device_id IN
-							(
-							SELECT device_id FROM users_rel
-							WHERE user_id = {$user->id}
-							)
-					ORDER BY r.device_id, r.time_marker
-					", array())->find_many();
 		}
 	}
 
@@ -195,7 +171,7 @@ function reportOnLocation($location) {
 		if($location == false) {
 			return;
 		}
-		
+
 		$viewData = array();
 		$viewData['location'] = $location;
 
@@ -211,20 +187,21 @@ function reportOnLocation($location) {
 		//Берём все сессии, связанные с данным расположением
 		$viewData['sessions'] = ORM::for_table('reading_sessions')
 			->raw_query(@"
-			SELECT r.id as session_id, r.time_marker, u.description as user_description
-			FROM reading_sessions r, users u, users_rel rel
-			WHERE r.location_id = {$location->id} and r.device_id = rel.device_id and rel.user_id = u.id
+			SELECT r.id as session_id, r.time_marker, r.count, u.description
+			FROM reading_sessions r
+			LEFT OUTER JOIN users_rel u_rel
+				LEFT OUTER JOIN users u
+				ON u.id = u_rel.user_id
+			ON r.device_id = u_rel.device_id
+			WHERE  r.location_id = {$location->id}
 			ORDER BY r.time_marker, u.description
 				", array())->find_many();
 
-		echo count($viewData['sessions']);
-
-
 		foreach($viewData['sessions'] as $session) {
-			$viewData['tags'][$session->id] = ORM::for_table('tubes')
+			$viewData['tags'][$session->session_id] = ORM::for_table('tubes')
 				->raw_query(@"
 					SELECT t.* FROM `tubes` t, `reading_sessions` r
-					WHERE r.location_id = {$location->id} and t.session_id = {$session->session_id}", array())
+					WHERE r.location_id = {$location->id} and t.session_id = {$session->session_id} ", array())
 				->find_many();
 		}
 

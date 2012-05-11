@@ -7,6 +7,7 @@
 		tr.report:nth-child(odd) {background: #FFF}
 		td.score {background: orange;}
 		tr { font-family: Calibri; }
+		td { vertical-align: top;}
 	</style>";
 
 class ReportView {
@@ -89,6 +90,26 @@ class ReportView {
 	}
 
 
+
+	static function oilrigManagerReport($viewData) {
+		global $style;
+
+		$user = $viewData['user'];
+
+		echo $style;
+
+		echo @"<table>
+		<thead>
+				<tr class='head'>
+					<td>Сотрудник</td>
+					<td>{$viewData['user']->description}</td>
+				</tr>
+			</thead>";
+
+		echo '</table>';
+		echo '<hr/>';
+	}
+
 	static function toolPusherReport($viewData) {
 		global $style;
 
@@ -97,7 +118,7 @@ class ReportView {
 
 		echo $style;
 
-		echo @"<table border=1>
+		echo @"<table>
 		<thead>
 				<tr class='head'>
 					<td>Сотрудник</td>
@@ -110,21 +131,20 @@ class ReportView {
 					<td colspan=4>Считано уникальных меток: {$viewData['total']}</td>
 				</tr>
 				<tr class='head'>
-					<td>Меток за сеанс</td>
-					<td>Время считывания</td>
-					<td>Считыватель</td>
-					<td>Место считывания</td>
+					<td colspan=2>Время</td>
+					<td>Место</td>
+					<td>Меток</td>
 				</tr>
 			</thead>";
 
-
 		foreach($viewData['sessions'] as $session) {
+			$date = new DateTime($session->time_marker);
 			echo @"
 				<tr class='report'>
+					<td>{$date->format('d.m.Y')}</td>
+					<td>{$date->format('H:i:s')}</td>
+					<td>{$viewData['locations'][$session->location_id]->description}</td>
 					<td>{$session->count}</td>
-					<td>{$session->time_marker}</td>
-					<td>{$device->description}
-					<td>{$locations[$session->location_id]}
 				</tr>";
 		}
 
@@ -140,14 +160,37 @@ class ReportView {
 		echo @"<table>
 		<thead>
 				<tr class='head'>
+					<td>Расположение</td>
+					<td colspan=4>{$viewData['location']->description}</td>
+				</tr>
+				<tr class='head'>
 					<td>Дата</td>
 					<td>Время</td>
 					<td>Считано</td>
 					<td>НКТ</td>
-					<td>Буровой мастер</td>
+					<td>Исполнитель</td>
 				</tr>
-			</thead>
-		<table>";
+			</thead>";
+
+		foreach($viewData['sessions'] as $session) {
+			$date = new DateTime($session->time_marker);
+
+			echo @"
+				<tr>
+					<td>{$date->format('d.m.Y')}</td>
+					<td>{$date->format('H:i:s')}</td>
+					<td><center><b><font size=5>{$session->count}</font></b></center></td>
+					<td>";
+					echo "<table>";
+					foreach($viewData['tags'][$session->session_id] as $tag) {
+						echo "<tr class='report'><td>{$tag->tag}</td></tr>";
+					}
+					echo "</table>";
+
+					echo @"</td>
+					<td>{$session->description}</td>
+				</tr>";
+		}	
 
 		echo '</table>';
 	}
