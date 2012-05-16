@@ -25,16 +25,25 @@ require_once 'response.php';
 require_once 'mockClient.php';
 //install.db should be
 //created in advance
-require_once 'install.php';
+//require_once 'install.php';
 
 $app->post('/post/:deviceKey/', 'post');
 $app->get('/report/user/:user/', 'reportOnUser');
 $app->get('/report/', 'reportsList');
 $app->get('/report/location/:location/', 'reportOnLocation');
+$app->get('/', 'indexRedirect');
+
+function indexRedirect() {
+	header('Location: /rfid/report/');
+	exit();
+}
 
 function post($deviceKey) {
 	try {
 		global $app;
+
+		//log
+		$handle = fopen("log.txt", "a+");
 
 		$device = Report::getDeviceByKey($deviceKey);
 
@@ -46,6 +55,9 @@ function post($deviceKey) {
 		//TODO::добавить JSON Scheme
 		$json = $app->request()->post('json');
 		$checksum = $app->request()->post('checksum');
+
+		fwrite($handle, $json."\n");
+		fwrite($handle, $checksum."\n\n");
 
 		if(strlen($json) == 0 || strlen($checksum) == 0) {
 			return Response::Set(Response::emptyRequest);
@@ -78,11 +90,14 @@ function post($deviceKey) {
 		}
 
 		Response::Set(null);
-
+		fclose($handle);
 	}
 
 	catch(Exception $e) {
+		$handle = fopen("exceptions.txt", "a+");
+		fwrite($e->getMessage()."\n\n");
 		return Response::Set(Response::internalServerError, $e->getMessage());
+		fclose();
 	}
 }
 
@@ -153,8 +168,6 @@ function reportOnUser($user) {
 				//	$viewData['users'][$pusher->device_id] = Report::getDeviceById($pusher->device_id);
 				}
 			}
-
-
 		}
 	}
 
@@ -201,7 +214,8 @@ function reportOnLocation($location) {
 			$viewData['tags'][$session->session_id] = ORM::for_table('tubes')
 				->raw_query(@"
 					SELECT t.* FROM `tubes` t, `reading_sessions` r
-					WHERE r.location_id = {$location->id} and t.session_id = {$session->session_id} ", array())
+					WHERE r.location_id = {$location->id} and t.session_id = {$session->session_id}
+					GROUP BY t.tag", array())
 				->find_many();
 		}
 

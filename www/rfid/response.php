@@ -8,7 +8,7 @@ class Response {
 	const emptyRequest			= 6;
 
 	//В случае ошибки $error != NULL
-	static function Set($error, $result = NULL) {		
+	static function Set($error, $result = NULL) {
 		echo json_encode(array('result' => $result, 'error' => $error));
 	}
 }
