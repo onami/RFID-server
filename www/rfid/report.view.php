@@ -22,6 +22,14 @@ class ReportView {
 		<table>
 			<thead>
 				<tr class='head'>
+					<td>Подвески</td>
+				</tr>
+			</thead>
+			<tr><td><a href='bundle/'>Посмотреть отчет</a></td></tr>
+		</table>	
+		<table>
+			<thead>
+				<tr class='head'>
 					<td>Сотрудник</td>
 					<td>Должность</td>
 				</tr>
@@ -89,6 +97,43 @@ class ReportView {
 		echo '</table>';
 	}
 
+
+	static function Bundles($viewData) {
+		global $style;
+
+		$sessionMode[0] = "Чтение";
+		$sessionMode[1] = "Запись";	
+				
+		echo $style;
+
+		echo @"<table>
+		<thead>
+				<tr class='head'>
+					<td>Устройство</td>
+					<td>ID метки</td>
+					<td>Номер скважины</td>
+					<td>Длина подвески</td>
+					<td>Дата формирования подвески</td>
+					<td>Время считывания</td>	
+					<td>Режим считывания</td>							
+				</tr>
+			</thead>";
+
+		foreach($viewData['bundles'] as $bundle) {
+			echo @"
+				<tr class='report'>
+					<td>{$viewData['devices'][$bundle->device_id]->description}</td>
+					<td>{$bundle->tag}</td>
+					<td>{$bundle->district_id}</td>
+					<td>{$bundle->bundle_length}</td>
+					<td>{$bundle->bundle_time}</td>
+					<td>{$bundle->session_time}</td>
+					<td>{$sessionMode[$bundle->session_mode]}</td>
+				</tr>";
+		}
+
+		echo '</table>';
+	}
 
 
 	static function oilrigManagerReport($viewData) {

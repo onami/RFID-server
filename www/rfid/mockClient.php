@@ -11,7 +11,21 @@ Class MockClient {
 	</form>
 END;
 	}
+
+	static function ViewPostBundle() {
+
+		echo <<<END
+	<script src="http://o/rfid/sha1.js" type="text/javascript" encoding="UTF-8"></script>	
+	<form action='/rfid/post/bundle/bgvlKW3ZAsLwzqLPkMXjG0oQJ6G4ax7eJxuZNbgN/' method='post' name='form1'>
+		<textarea rows=25 cols=100 name='json'>{"sessionMode":"1", "bundle":{"time":"2012-05-02 14:34:43", "districtId":"1000", "length":"1200"}}</textarea>
+		<br/><input onclick='form1.checksum.value = SHA1(form1.json.value)' type=submit>
+		<input name='checksum' size=44 type=text value="">
+	</form>
+END;
+	}
+
 }
 
 $app->get('/post/', 'MockClient::ViewPost');
+$app->get('/post/bundle/', 'MockClient::ViewPostBundle');
 ?>

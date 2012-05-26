@@ -9,8 +9,13 @@ require_once 'Slim/Slim.php';
 require_once 'idiorm.php';
 
 $app = new Slim(array());
+$dbname = "abitechk_rfid";
+$basedir = "/rfid";
 
-require_once 'config.php';
+ORM::configure('mysql:host=localhost;dbname='.$dbname);
+ORM::configure('username', 'abitechk_rfid');
+ORM::configure('password', 'Ii4ZNzOZN8ek5uz');
+ORM::get_db()->exec('set names utf8');
 
 /*******************************************************/
 
@@ -23,11 +28,8 @@ require_once 'mockClient.php';
 //require_once 'install.php';
 
 $app->post('/post/:deviceKey/', 'post');
-$app->post('/post/bundle/:deviceKey/', 'postBundle');
-
-$app->get('/report/', 'reportsList');
 $app->get('/report/user/:user/', 'reportOnUser');
-$app->get('/report/bundle/', 'reportOnBundles');
+$app->get('/report/', 'reportsList');
 $app->get('/report/location/:location/', 'reportOnLocation');
 $app->get('/', 'indexRedirect');
 
@@ -36,68 +38,6 @@ function indexRedirect() {
 	exit();
 }
 
-function postBundle($deviceKey) {
-	try {
-		global $app;
-
-		//log
-		$handle = fopen("log.txt", "a+");
-
-		$device = Report::getDeviceByKey($deviceKey);
-        
-		if($device == false) {
-			Response::Set(Response::invalidDeviceKey);
-			return;
-		}
-
-		//TODO::добавить JSON Scheme
-		$json = $app->request()->post('json');
-		$checksum = $app->request()->post('checksum');
-
-		fwrite($handle, $json."\n");
-		fwrite($handle, $checksum."\n\n");
-
-		if(strlen($json) == 0 || strlen($checksum) == 0) {
-			return Response::Set(Response::emptyRequest);
-		}
-
-		if(sha1($json) != $checksum) {
-			return Response::Set(Response::corruptedChecksum);
-		}
-
-		if(Report::getBundleByChecksum($checksum) != false) {
-			return Response::Set(Response::duplicatedMessage);
-		}	
-
-		$json = json_decode($json, true);
-
-		//Не работает на PHP 5.2
-/*		if(json_last_error() != JSON_ERROR_NONE) {
-			return Response::Set(Response::corruptedFormat);
-		}
-*/
-		try {
-			ORM::get_db()->beginTransaction();
-			Report::createBundle($device, $json, $checksum);
-			ORM::get_db()->commit();
-		}
-
-		catch(Exception $e) {
-			ORM::get_db()->rollBack();
-			throw new Exception($e->getMessage());
-		}
-
-		Response::Set(null);
-		fclose($handle);
-	}
-
-	catch(Exception $e) {
-		$handle = fopen("exceptions.txt", "a+");
-		fwrite($handle, $e->getMessage()."\n\n");
-		return Response::Set(Response::internalServerError, $e->getMessage());
-		fclose();
-	}
-}
 
 function post($deviceKey) {
 	try {
@@ -135,10 +75,10 @@ function post($deviceKey) {
 		$json = json_decode($json, true);
 
 		//Не работает на PHP 5.2
-/*		if(json_last_error() != JSON_ERROR_NONE) {
-			return Response::Set(Response::corruptedFormat);
-		}
-*/
+		// if(json_last_error() != JSON_ERROR_NONE) {
+		// 	return Response::Set(Response::corruptedFormat);
+		// }
+
 		try {
 			ORM::get_db()->beginTransaction();
 			Report::create($device, $json, $checksum);
@@ -151,7 +91,7 @@ function post($deviceKey) {
 		}
 
 		Response::Set(null);
-		fclose($handle);
+
 	}
 
 	catch(Exception $e) {
@@ -172,20 +112,6 @@ function reportsList() {
 
 		ReportView::RenderList($viewData);
 }
-
-function reportOnBundles() {
-	try {	
-		$viewData['devices'] = Report::getDictionary('devices');
-		$viewData['bundles'] = ORM::for_table('tubes_bundles')->order_by_asc('bundle_time')->order_by_asc('session_time')->find_many();
-		ReportView::Bundles($viewData);
-	}
-
-	catch(Exception $e) {
-		Response::Set(Response::internalServerError, $e->getMessage());
-		return;
-	}
-}
-
 
 function reportOnUser($user) {
 	try {		

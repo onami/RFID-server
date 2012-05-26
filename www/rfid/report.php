@@ -36,6 +36,10 @@ class Report {
 		return self::getRecord('reading_sessions', 'checksum', $checksum);
 	}
 
+	static function getBundleByChecksum($checksum) {
+		return self::getRecord('tubes_bundles', 'checksum', $checksum);
+	}
+
 	static function getUserById($id) {
 		return self::getRecord('users', 'id', $id);
 	}
@@ -108,6 +112,20 @@ class Report {
 			$tagInfo->last_session_id = $record->session_id;
 			$tagInfo->save();
 		}
+	}
+
+	static function createBundle($device, $json, $checksum) {
+		$session = ORM::for_table('tubes_bundles')->create();
+		$session->tag 			= $json['tag'];
+		$session->checksum		= $checksum;
+		$session->device_id		= $device->id;
+		$session->session_time	= $json['time'];
+		$session->session_mode 	= $json['sessionMode'];
+		$session->district_id	= $json['bundle']['districtId'];
+		$session->bundle_length	= $json['bundle']['bundleLength'];
+		$session->bundle_time 	= date('Y-m-d H:i:s', $json['bundle']['time']);
+
+		$session->save();
 	}
 }
 ?>
